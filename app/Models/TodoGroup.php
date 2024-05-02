@@ -21,4 +21,8 @@ class TodoGroup extends Model
     {
         return $this->hasMany(Todo::class);
     }
+    public function file()
+    {
+        return $this->hasMany(File::class);
+    }
 }

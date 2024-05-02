@@ -69,6 +69,38 @@
                     </button>
                 </div>
             </div>
+            <div
+                :class="`flex w-full overflow-y-auto gap-2 ${
+                    !files.length && 'justify-center'
+                }`"
+            >
+                <input
+                    type="file"
+                    id="file"
+                    class="hidden"
+                    @change="handleFileUpload"
+                />
+                <div
+                    v-for="(file, index) in files"
+                    class="flex w-36 border rounded-xl items-center h-full px-1"
+                >
+                    <p class="truncate">{{ file.name }}</p>
+                    <button
+                        type="button"
+                        class="border-none p-0 hover:text-red-500 hover:bg-transparent flex items-center"
+                        :onclick="() => files.splice(index, 1)"
+                    >
+                        <v-icon name="bi-x-lg" />
+                    </button>
+                </div>
+                <label
+                    for="file"
+                    class="border px-2 py-1 rounded-xl cursor-pointer hover:bg-white hover:text-slate-900 flex items-center"
+                >
+                    <v-icon v-if="files.length" name="co-plus" />
+                    <p v-else>Upload File</p>
+                </label>
+            </div>
             <p class="text-red-500 text-lg">{{ error }}</p>
             <div
                 class="border-t border-slate-500 flex w-full justify-between py-2"
@@ -90,6 +122,7 @@ export default {
     data() {
         return {
             todoList: ["", ""],
+            files: [],
             deadline: "",
             title: "",
             error: "",
@@ -99,21 +132,39 @@ export default {
         handleClose() {
             this.$refs.formRef.reset();
             this.todoList = ["", ""];
+            this.files = [];
             this.error = "";
+            this.deadline = "";
+            this.title = "";
             this.changeNewList(false);
+        },
+        handleFileUpload(event) {
+            this.files.push(event.target.files[0]);
+            console.log(this.files);
         },
         handleSubmit() {
             this.error = "";
+            const formData = new FormData();
             if (!this.todoList.length) {
                 return (this.error = "At least one task is required.");
             }
+            for (let i = 0; i < this.files.length; i++) {
+                formData.append("files[]", this.files[i]);
+            }
+            for (let i = 0; i < this.todoList.length; i++) {
+                formData.append("todo[]", this.todoList[i]);
+            }
+            formData.append("title", this.title);
+            formData.append("deadline", this.deadline);
             axios
-                .post("/api/todoGroup", {
-                    title: this.title,
-                    deadline: this.deadline,
-                    todo: this.todoList,
-                })
+                .post("/api/todoGroup", formData)
                 .then(() => {
+                    this.$refs.formRef.reset();
+                    this.todoList = ["", ""];
+                    this.files = [];
+                    this.error = "";
+                    this.deadline = "";
+                    this.title = "";
                     this.$props.getTodoLists();
                     this.$props.changeNewList(false);
                 })

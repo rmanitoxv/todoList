@@ -10,6 +10,7 @@ import {
     MdArrowdropupRound,
     MdCheckboxoutlineblank,
     MdCheckboxRound,
+    HiSolidDownload,
 } from "oh-vue-icons/icons";
 
 addIcons(
@@ -18,7 +19,8 @@ addIcons(
     MdArrowdropdownRound,
     MdArrowdropupRound,
     MdCheckboxoutlineblank,
-    MdCheckboxRound
+    MdCheckboxRound,
+    HiSolidDownload
 );
 
 createApp(App).component("v-icon", OhVueIcon).mount("#app");

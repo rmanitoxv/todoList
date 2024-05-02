@@ -45,6 +45,7 @@
             :style="isTodoOpen ? 'height:' + todoRows : 'height: 0'"
         >
             <Todo
+                v-if="isTodoOpen"
                 v-for="(todo, index) in todoGroup.todo"
                 :todo="todo"
                 :index="index"
@@ -74,6 +75,50 @@
                 >
                     Add new task <v-icon name="co-plus" />
                 </button>
+            </div>
+            <div
+                v-if="isTodoOpen"
+                :class="`flex w-full overflow-y-auto gap-2 cursor-pointer ${
+                    !todoGroup.file.length && 'justify-center'
+                }`"
+            >
+                <input
+                    type="file"
+                    id="newFile"
+                    class="hidden"
+                    :onchange="handleFileUpload"
+                />
+                <div
+                    v-for="(file, index) in todoGroup.file"
+                    class="flex w-36 border rounded-xl items-center px-1"
+                >
+                    <p class="truncate">{{ file.file_name }}</p>
+                    <button
+                        v-if="file.id"
+                        type="button"
+                        class="border-none p-0 hover:text-green-500 hover:bg-transparent bg-transparent flex items-center"
+                        @click="downloadFile(file.file_path, file.file_name)"
+                    >
+                        <v-icon name="hi-solid-download" />
+                    </button>
+                    <button
+                        type="button"
+                        :class="`border-none p-0 hover:text-red-500 hover:bg-transparent bg-transparent flex items-center ${
+                            !isOnEdit && 'hidden'
+                        }`"
+                        @click="() => handleRemoveFile(index, file.id)"
+                    >
+                        <v-icon name="bi-x-lg" />
+                    </button>
+                </div>
+                <label
+                    v-if="isOnEdit"
+                    for="newFile"
+                    class="border px-2 py-1 rounded-xl cursor-pointer hover:bg-white hover:text-slate-900 flex items-center"
+                >
+                    <v-icon v-if="todoGroup.file.length" name="co-plus" />
+                    <p v-else>Upload File</p>
+                </label>
             </div>
         </div>
         <div
@@ -129,42 +174,65 @@ export default {
             isOnEdit: false,
             isTodoOpen: false,
             todoRows: `${
-                (Math.floor(this.todoGroup.todo.length / 2) + 1) * 5
+                (Math.floor(this.todoGroup.todo.length / 2) + 1) * 5 + 2
             }rem`,
             deletedTasks: [],
+            deletedFiles: [],
+            files: [],
         };
     },
     methods: {
-        handleSubmit() {
-            axios
-                .patch("/api/todoGroup/" + this.$props.todoGroup.id, {
-                    title: this.$props.todoGroup.title,
-                    deadline: this.$props.todoGroup.deadline,
-                    todo: this.$props.todoGroup.todo.filter((item) => {
-                        return item.id;
-                    }),
-                })
-                .then((response) => console.log(response))
-                .catch((error) => console.error(error));
+        handleFileUpload(event) {
+            this.files.push(event.target.files[0]);
+            this.$props.todoGroup.file.push({
+                file_name: event.target.files[0].name,
+            });
+        },
+        async handleSubmit() {
+            await axios.patch("/api/todoGroup/" + this.$props.todoGroup.id, {
+                title: this.$props.todoGroup.title,
+                deadline: this.$props.todoGroup.deadline,
+                todo: this.$props.todoGroup.todo.filter((item) => {
+                    return item.id;
+                }),
+            });
             for (const todo of this.$props.todoGroup.todo) {
                 if (!todo.id && todo.name.length) {
-                    return axios.post("/api/todo", {
+                    await axios.post("/api/todo", {
                         todo: this.$props.todoGroup.todo.filter((item) => {
                             return !item.id && item.name.length;
                         }),
                     });
+                    break;
                 }
             }
             if (this.deletedTasks.length) {
-                console.log(this.deletedTasks);
-                axios.post("/api/deleteTodo", {
+                await axios.post("/api/deleteTodo", {
                     ids: this.deletedTasks,
                 });
             }
+            if (this.deletedFiles.length) {
+                await axios.post("/api/deleteFile", {
+                    ids: this.deletedFiles,
+                });
+            }
+            if (this.files.length) {
+                const formData = new FormData();
+                for (let i = 0; i < this.files.length; i++) {
+                    formData.append("files[]", this.files[i]);
+                }
+                formData.append("todo_group_id", this.$props.todoGroup.id);
+                await axios.post("/api/file", formData);
+            }
+            this.$props.getTodoLists();
         },
         handleRemoveTask(index, id) {
             if (id) this.deletedTasks.push(id);
             this.$props.todoGroup.todo.splice(index, 1);
+        },
+        handleRemoveFile(index, id) {
+            if (id) this.deletedFiles.push(id);
+            this.$props.todoGroup.file.splice(index, 1);
         },
         handleDelete() {
             axios
@@ -172,12 +240,29 @@ export default {
                 .then(() => this.$props.getTodoLists())
                 .catch((error) => console.error(error));
         },
+        downloadFile(filePath, fileName) {
+            axios
+                .get(`/api/download-file/${filePath}`, {
+                    responseType: "blob",
+                })
+                .then((response) => {
+                    const url = window.URL.createObjectURL(
+                        new Blob([response.data])
+                    );
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.setAttribute("download", fileName); // set desired file name
+                    document.body.appendChild(link);
+                    link.click();
+                })
+                .catch((error) => console.error(error));
+        },
     },
     watch: {
         "todoGroup.todo": {
             handler: function (newValue, oldValue) {
                 this.todoRows = `${
-                    (Math.floor(newValue.length / 2) + 1) * 5
+                    (Math.floor(newValue.length / 2) + 1) * 5 + 2
                 }rem`;
             },
             deep: true,

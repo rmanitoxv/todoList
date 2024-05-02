@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TodoGroup;
 use App\Models\Todo;
+use App\Models\File;
 use Illuminate\Http\Request;
 
 class TodoGroupController extends Controller
@@ -13,7 +14,7 @@ class TodoGroupController extends Controller
      */
     public function index()
     {
-        $todoGroup = TodoGroup::with('todo')->orderBy('deadline')->get();
+        $todoGroup = TodoGroup::with('todo')->with('file')->orderBy('deadline')->get();
         $groupedTodoGroups = $todoGroup->groupBy('deadline');
         return response($groupedTodoGroups);
     }
@@ -26,7 +27,8 @@ class TodoGroupController extends Controller
         $fields = $request->validate([
             'title' => 'required|string|max:16',
             'deadline' => 'required|date|after_or_equal:' . now()->toDateString(),
-            'todo.*' => 'required|string|max:64'
+            'todo' => 'required|array',
+            'files.*' => 'file'
         ]);
         $todoGroup = new TodoGroup();
         $todoGroup->title = $fields['title'];
@@ -39,6 +41,15 @@ class TodoGroupController extends Controller
             $todo->name = $todoName;
             $todo->save();
         }
+        foreach ($request->file('files') as $file) {
+            $filePath = $file->store();
+            $fileModel = new File();
+            $fileModel->file_path = $filePath;
+            $fileModel->file_name = $file->getClientOriginalName();
+            $fileModel->todo_group_id = $todoGroup->id;
+            $fileModel->save();
+        }
+
         return response($todoGroup, 201);
     }
 
@@ -58,7 +69,8 @@ class TodoGroupController extends Controller
         $fields = $request->validate([
             'title' => 'required|string|max:16',
             'deadline' => 'required|date|after_or_equal:' . now()->toDateString(),
-            'todo' => 'required|array'
+            'todo' => 'required|array',
+            'files' => 'array'
         ]);
         $todoGroups = TodoGroup::findOrFail($id);
         $todoGroups->update($request->all());
